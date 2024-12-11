@@ -2,13 +2,36 @@ use std::{
     collections::HashMap,
     fs::File,
     io::Read,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{
+        SystemTime,
+        UNIX_EPOCH,
+    },
 };
 
-use color_eyre::eyre::{eyre, Result};
+use color_eyre::eyre::{
+    eyre,
+    Result,
+};
 const RAM_SIZE: usize = 4096;
 const INSTRUCTIONS_PER_SECOND: usize = 1;
 const MS_PER_INSTRUCTION: u128 = (1000 / INSTRUCTIONS_PER_SECOND) as u128;
+
+struct ProgramCounter(usize);
+
+impl ProgramCounter {
+    fn inner(&self) -> &usize {
+        &self.0
+    }
+    fn increment(&mut self) {
+        self.0 += 2;
+        self.0 %= RAM_SIZE;
+    }
+
+    fn jump(&mut self, address: usize) {
+        self.0 = address;
+    }
+}
+
 pub struct ROM {
     data: Vec<u8>,
 }
@@ -65,7 +88,7 @@ impl InstructionData {
 
 struct Emulator {
     memory: [u8; RAM_SIZE],
-    pc: usize,
+    pc: ProgramCounter,
     stack: Vec<u16>,
     registers: HashMap<String, u16>,
     index_register: u16,
@@ -93,7 +116,7 @@ impl Emulator {
         ]);
         Self {
             memory: rom.load_into_memory(),
-            pc: 0,
+            pc: ProgramCounter(0),
             stack: vec![],
             registers,
             index_register: 0,
@@ -101,10 +124,8 @@ impl Emulator {
     }
 
     fn run(&mut self) {
-        let op_code = (self.memory[self.pc] as u16) << 8 | (self.memory[self.pc + 1] as u16);
-
-        self.pc += 2;
-        self.pc %= RAM_SIZE;
+        let op_code = (self.memory[*self.pc.inner()] as u16) << 8 | (self.memory[self.pc.inner() + 1] as u16);
+        self.pc.increment();
 
         let instruction_data = InstructionData {
             op_code,
@@ -126,7 +147,7 @@ impl Emulator {
             }
             (_, 0x1000) => {
                 println!("Set PC to {}", instruction_data.nnn);
-                self.pc = instruction_data.nnn as usize;
+                self.pc.jump(instruction_data.nnn as usize);
             }
             (_, 0x6000) => {
                 println!("Set register {} to {}", instruction_data.x, instruction_data.nn);
