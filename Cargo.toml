@@ -1,0 +1,15 @@
+[package]
+name = "chip8rs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "chip8rs"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+clap = { version = "4.5.23", features = ["derive"] }
+color-eyre = "0.6.3"
