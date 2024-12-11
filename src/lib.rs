@@ -1,18 +1,11 @@
 use std::{
-    alloc::System,
     collections::HashMap,
     fs::File,
     io::Read,
-    time::{
-        SystemTime,
-        UNIX_EPOCH,
-    },
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use color_eyre::eyre::{
-    eyre,
-    Result,
-};
+use color_eyre::eyre::{eyre, Result};
 const RAM_SIZE: usize = 4096;
 const INSTRUCTIONS_PER_SECOND: usize = 1;
 const MS_PER_INSTRUCTION: u128 = (1000 / INSTRUCTIONS_PER_SECOND) as u128;
@@ -112,6 +105,7 @@ impl Emulator {
 
         self.pc += 2;
         self.pc %= RAM_SIZE;
+
         let instruction_data = InstructionData {
             op_code,
             instruction: op_code & 0xF000,
@@ -126,6 +120,7 @@ impl Emulator {
 
     fn execute(&mut self, instruction_data: InstructionData) {
         match (instruction_data.op_code, instruction_data.instruction) {
+            (0x0000, _) => {}
             (0x00E0, _) => {
                 println!("Clear screen");
             }
