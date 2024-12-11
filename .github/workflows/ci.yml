@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          rustup update --no-self-update stable nightly
+          rustup component add --toolchain stable clippy
+          rustup component add --toolchain nightly rustfmt
+          rustup default stable
+
+      - name: Run fmt
+        if: always()
+        run: cargo +nightly fmt -- --check
+
+      - name: Run clippy
+        if: always()
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        if: always()
+        run: cargo test --verbose
