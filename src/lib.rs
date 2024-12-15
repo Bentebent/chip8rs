@@ -21,6 +21,11 @@ use macroquad::{
         self,
         GOLD,
     },
+    input::{
+        get_keys_pressed,
+        is_key_pressed,
+        KeyCode,
+    },
     math::vec2,
     miniquad::start,
     prelude::{
@@ -275,6 +280,10 @@ pub async fn run(path: String, pixel_size: i32, window_size: (i32, i32)) -> Resu
             );
 
             next_frame().await
+        }
+
+        if is_key_pressed(KeyCode::Escape) {
+            break;
         }
     }
 
