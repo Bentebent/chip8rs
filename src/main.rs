@@ -24,6 +24,7 @@ async fn main() {
     color_eyre::install().expect("Failed to initialize color_eyre error handler");
 
     let path = r"roms/IBM Logo.ch8";
+    let path = r"roms/test_opcode.ch8";
     if let Err(error) = chip8rs::run(path.into(), PIXEL_SIZE, (SCREEN_WIDTH, SCREEN_HEIGHT)).await {
         println!("Chip8 emulator failed in an unexpected manner: {}", error)
     }

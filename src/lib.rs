@@ -43,10 +43,11 @@ use macroquad::{
         screen_width,
     },
 };
-const RAM_SIZE: usize = 4096;
-const INSTRUCTIONS_PER_SECOND: usize = 1;
+const RAM_SIZE: usize = 0x1000;
+const INSTRUCTIONS_PER_SECOND: usize = 700;
 const MS_PER_INSTRUCTION: u128 = (1000 / INSTRUCTIONS_PER_SECOND) as u128;
-const MEMORY_OFFSET: usize = 512;
+const MEMORY_OFFSET: usize = 0x200;
+const DISPLAY_RANGE: (usize, usize) = (0xF00, 0xFFF);
 
 struct ProgramCounter(usize);
 
@@ -178,8 +179,8 @@ impl Emulator {
         let instruction_data = InstructionData {
             op_code,
             instruction: op_code & 0xF000,
-            x: format!("V{:x}", (op_code & 0x0F00) >> 8),
-            y: format!("V{:x}", (op_code & 0x00F0) >> 4),
+            x: format!("V{:X}", (op_code & 0x0F00) >> 8),
+            y: format!("V{:X}", (op_code & 0x00F0) >> 4),
             n: op_code & 0x000F,
             nn: op_code & 0x00FF,
             nnn: op_code & 0x0FFF,
@@ -194,9 +195,17 @@ impl Emulator {
                 println!("Clear screen");
                 set_camera(&self.camera);
                 clear_background(color::BLACK);
+                self.memory[DISPLAY_RANGE.0..DISPLAY_RANGE.1].fill(0);
+            }
+            (0x00EE, _) => {
+                self.pc.jump(self.stack.pop().unwrap() as usize);
             }
             (_, 0x1000) => {
                 println!("Set PC to {}", instruction_data.nnn);
+                self.pc.jump(instruction_data.nnn as usize);
+            }
+            (_, 0x2000) => {
+                self.stack.push(self.pc.0 as u16);
                 self.pc.jump(instruction_data.nnn as usize);
             }
             (_, 0x6000) => {
@@ -212,38 +221,71 @@ impl Emulator {
                 self.index_register = instruction_data.nnn;
             }
             (_, 0xD000) => {
-                let start_x: i32 =
-                    (*self.registers.get(&instruction_data.x).unwrap() as i32 % self.window_size.0) * self.pixel_size;
+                let start_x = (*self.registers.get(&instruction_data.x).unwrap() as i32) % self.window_size.0;
+                let start_y = (*self.registers.get(&instruction_data.y).unwrap() as i32) % self.window_size.1;
+                *self.registers.get_mut("VF").unwrap() = 0;
 
-                let start_y: i32 =
-                    (*self.registers.get(&instruction_data.y).unwrap() as i32 % self.window_size.1) * self.pixel_size;
                 println!(
-                    "Draw sprite {} at position ({:?}, {:?} with size {})",
+                    "Draw sprite {} at position ({:?}, {:?}) with size {}",
                     self.index_register, start_x, start_y, instruction_data.n
                 );
 
                 set_camera(&self.camera);
-                let size = instruction_data.n as usize;
-                for y in 0..size {
-                    let index = self.index_register as usize + y;
-                    let sprite = *self.memory.get(index).unwrap();
-                    for x in (0..u8::BITS).rev() {
-                        let bit = (sprite >> x) & 1;
-                        //                        let bit = (sprite >> x) & 1;
-                        if bit == 1 {
-                            draw_rectangle(
-                                (start_x + (u8::BITS - x) as i32 * self.pixel_size) as f32,
-                                (start_y + (y as i32) * self.pixel_size) as f32,
-                                self.pixel_size as f32,
-                                self.pixel_size as f32,
-                                color::Color {
-                                    r: 0.,
-                                    g: 128.0,
-                                    b: 0.,
-                                    a: 1.,
-                                },
-                            );
+                let sprite_height = instruction_data.n as usize;
+
+                for y in 0..sprite_height {
+                    let sprite = *self.memory.get((self.index_register as usize) + y).unwrap();
+                    let screen_pos_y = start_y + y as i32;
+
+                    if screen_pos_y >= self.window_size.1 {
+                        continue; // Skip rows that exceed the screen height
+                    }
+
+                    for x in 0..8 {
+                        let screen_pos_x = start_x + (7 - x);
+                        if screen_pos_x >= self.window_size.0 {
+                            continue; // Skip columns that exceed the screen width
                         }
+
+                        // Get the current pixel in the sprite
+                        let bit = (sprite >> x) & 1;
+                        if bit == 0 {
+                            continue; // Skip processing for pixels that are not set in the sprite
+                        }
+
+                        // Calculate the display bit index and position
+                        let display_bit_idx = (screen_pos_y * self.window_size.0 + screen_pos_x) as u32;
+                        let display_byte_idx = display_bit_idx / 8; // 8 bits in a byte
+                        let display_bit_pos = (display_bit_idx % 8) as u8;
+
+                        // Modify the display byte
+                        let display_byte = self.memory.get_mut(display_byte_idx as usize).unwrap();
+                        let display_bit = (*display_byte >> display_bit_pos) & 1;
+
+                        if display_bit == 1 {
+                            *self.registers.get_mut("VF").unwrap() = 1; // Set VF if a pixel is flipped off
+                        }
+                        *display_byte ^= 1 << display_bit_pos;
+
+                        // Determine the color and draw the pixel
+                        let color = if (*display_byte >> display_bit_pos) & 1 == 1 {
+                            color::Color {
+                                r: 0.,
+                                g: 128.0,
+                                b: 0.,
+                                a: 1.,
+                            }
+                        } else {
+                            color::BLACK
+                        };
+
+                        draw_rectangle(
+                            (screen_pos_x * self.pixel_size) as f32,
+                            (screen_pos_y * self.pixel_size) as f32,
+                            self.pixel_size as f32,
+                            self.pixel_size as f32,
+                            color,
+                        );
                     }
                 }
             }
