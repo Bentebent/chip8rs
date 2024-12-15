@@ -19,21 +19,17 @@ use macroquad::{
     },
     color::{
         self,
-        GOLD,
     },
     input::{
-        get_keys_pressed,
         is_key_pressed,
         KeyCode,
     },
     math::vec2,
-    miniquad::start,
     prelude::{
         clear_background,
         draw_rectangle,
         next_frame,
         render_target,
-        scene::clear,
         set_camera,
         Rect,
     },
@@ -110,7 +106,7 @@ struct InstructionData {
 }
 
 impl InstructionData {
-    fn print(&self) {
+    fn debug_print(&self) {
         println!("op_code: {:x}", self.op_code);
         println!("instruction: {:x}", self.instruction);
 
