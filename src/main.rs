@@ -23,6 +23,7 @@ fn window_conf() -> Conf {
 async fn main() {
     color_eyre::install().expect("Failed to initialize color_eyre error handler");
 
+    #[allow(unused_variables)]
     let path = r"roms/IBM Logo.ch8";
     let path = r"roms/test_opcode.ch8";
     if let Err(error) = chip8rs::run(path.into(), PIXEL_SIZE, (SCREEN_WIDTH, SCREEN_HEIGHT)).await {
