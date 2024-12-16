@@ -1,3 +1,5 @@
+use std::env;
+
 use macroquad::{
     miniquad,
     window::Conf,
@@ -21,11 +23,13 @@ fn window_conf() -> Conf {
 }
 #[macroquad::main(window_conf)]
 async fn main() {
+    env::set_var("RUST_BACKTRACE", "1");
     color_eyre::install().expect("Failed to initialize color_eyre error handler");
 
     #[allow(unused_variables)]
     let path = r"roms/IBM Logo.ch8";
-    let path = r"roms/test_opcode.ch8";
+    //let path = r"roms/test_flags.ch8";
+    //let path = r"roms/test_opcode.ch8";
     if let Err(error) = chip8rs::run(path.into(), PIXEL_SIZE, (SCREEN_WIDTH, SCREEN_HEIGHT)).await {
         println!("Chip8 emulator failed in an unexpected manner: {}", error)
     }
