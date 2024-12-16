@@ -130,6 +130,21 @@ pub fn op_ANNN(index_register: &mut u16, nnn: u16) {
     *index_register = nnn;
 }
 
+pub fn op_BNNN(interpreter: &Interpreter, register: &Register, pc: &mut ProgramCounter, x: String, nnn: u16) {
+    match interpreter {
+        Interpreter::CosmacVIP => {
+            pc.jump(nnn + register.get("V0") as u16);
+        }
+        Interpreter::Chip48 | Interpreter::SuperChip => {
+            pc.jump(nnn + register.get(&x) as u16);
+        }
+    }
+}
+
+pub fn op_CXNN(register: &mut Register, x: String, nn: u8) {
+    *register.get_mut(&x) = rand::random::<u8>() & nn;
+}
+
 pub fn DXYN(
     memory: &mut Ram,
     register: &mut Register,
@@ -199,5 +214,58 @@ pub fn DXYN(
                 color,
             );
         }
+    }
+}
+
+pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) {
+    *register.get_mut(&x) = *delay_timer;
+}
+
+pub fn op_FX15(register: &mut Register, x: String, delay_timer: &mut u8) {
+    *delay_timer = register.get(&x);
+}
+
+pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8) {
+    *sound_timer = register.get(&x);
+}
+
+pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
+    *index_register = index_register.wrapping_add(register.get(&x) as u16);
+}
+
+pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register: u16) {
+    let mut val = register.get(&x);
+
+    for i in (0..3).rev() {
+        let remainder = val % 10;
+        val /= 10;
+        *memory.get_mut(index_register + i) = remainder;
+    }
+}
+
+pub fn op_FX55(interpreter: &Interpreter, register: &Register, memory: &mut Ram, index_register: &mut u16, x: String) {
+    let range: u16 = x[1..].parse().unwrap();
+
+    for i in 0..=range {
+        let addr = if let Interpreter::CosmacVIP = interpreter {
+            *index_register += i;
+            *index_register
+        } else {
+            *index_register + i
+        };
+        *memory.get_mut(addr) = register.get(&format!("V{}", i));
+    }
+}
+
+pub fn op_FX65(interpreter: &Interpreter, register: &mut Register, memory: &Ram, index_register: &mut u16, x: String) {
+    let range: u16 = x[1..].parse().unwrap();
+    for i in 0..=range {
+        let addr = if let Interpreter::CosmacVIP = interpreter {
+            *index_register += i;
+            *index_register
+        } else {
+            *index_register + i
+        };
+        *register.get_mut(&format!("V{}", i)) = memory.get(addr);
     }
 }

@@ -184,6 +184,8 @@ pub struct Emulator {
     stack: Vec<u16>,
     register: Register,
     index_register: u16,
+    delay_timer: u8,
+    sound_timer: u8,
     pixel_size: i32,
     window_size: (i32, i32),
     render_target: RenderTarget,
@@ -206,6 +208,8 @@ impl Emulator {
             stack: vec![],
             register: Register::new(),
             index_register: 0,
+            delay_timer: 0,
+            sound_timer: 0,
             pixel_size,
             window_size,
             render_target,
@@ -302,6 +306,18 @@ impl Emulator {
             (_, 0xA000) => {
                 process::op_ANNN(&mut self.index_register, instruction_data.nnn);
             }
+            (_, 0xB000) => {
+                process::op_BNNN(
+                    &self.interpreter,
+                    &self.register,
+                    &mut self.pc,
+                    instruction_data.x,
+                    instruction_data.nnn,
+                );
+            }
+            (_, 0xC000) => {
+                process::op_CXNN(&mut self.register, instruction_data.x, instruction_data.nn);
+            }
             (_, 0xD000) => {
                 process::DXYN(
                     &mut self.memory,
@@ -313,7 +329,46 @@ impl Emulator {
                     instruction_data,
                 );
             }
-            _ => println!("Instruction not implemented: {:x}", instruction_data.instruction),
+            (_, 0xF000) if instruction_data.n == 0x7 => {
+                process::op_FX07(&mut self.register, instruction_data.x, &self.delay_timer);
+            }
+
+            (_, 0xF000) if instruction_data.nn == 0xF => {
+                process::op_FX15(&mut self.register, instruction_data.x, &mut self.delay_timer);
+            }
+            (_, 0xF000) if instruction_data.n == 0x12 => {
+                process::op_FX18(&mut self.register, instruction_data.x, &mut self.sound_timer);
+            }
+            (_, 0xF000) if instruction_data.nn == 0x1E => {
+                process::op_FX1E(&self.register, instruction_data.x, &mut self.index_register);
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF033 => {
+                process::op_FX33(
+                    &self.register,
+                    &mut self.memory,
+                    instruction_data.x,
+                    self.index_register,
+                );
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF055 => {
+                process::op_FX55(
+                    &self.interpreter,
+                    &self.register,
+                    &mut self.memory,
+                    &mut self.index_register,
+                    instruction_data.x,
+                );
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF065 => {
+                process::op_FX65(
+                    &self.interpreter,
+                    &mut self.register,
+                    &self.memory,
+                    &mut self.index_register,
+                    instruction_data.x,
+                );
+            }
+            _ => println!("Instruction not implemented: {:x}", instruction_data.op_code),
         }
     }
 
