@@ -4,12 +4,9 @@ use std::{
     io::Read,
 };
 
-use color_eyre::{
-    eyre::{
-        eyre,
-        Result,
-    },
-    owo_colors::OwoColorize,
+use color_eyre::eyre::{
+    eyre,
+    Result,
 };
 use macroquad::{
     camera::{

@@ -11,7 +11,6 @@ use macroquad::{
     shapes::draw_rectangle,
     window::clear_background,
 };
-use rand::seq::index;
 
 use crate::{
     constants,
