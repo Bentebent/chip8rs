@@ -11,6 +11,7 @@ use macroquad::{
     shapes::draw_rectangle,
     window::clear_background,
 };
+use rand::seq::index;
 
 use crate::{
     constants,
@@ -234,9 +235,13 @@ pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
     *index_register = index_register.wrapping_add(register.get(&x) as u16);
 }
 
+pub fn op_FX0A(pc: &mut ProgramCounter) {
+    pc.decrement();
+}
+
 pub fn op_FX29(register: &Register, index_register: &mut u16, x: String) {
     let font_char = register.get(&x);
-    println!("{:X}", font_char);
+    *index_register = (font_char * 5) as u16;
 }
 
 pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register: u16) {

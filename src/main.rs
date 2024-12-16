@@ -30,6 +30,7 @@ async fn main() {
     let path = r"roms/IBM Logo.ch8";
     //let path = r"roms/test_flags.ch8";
     let path = r"roms/test_opcode.ch8";
+    let path = r"roms/addition_problems.ch8";
     if let Err(error) = chip8rs::run(path.into(), PIXEL_SIZE, (SCREEN_WIDTH, SCREEN_HEIGHT)).await {
         println!("Chip8 emulator failed in an unexpected manner: {}", error)
     }

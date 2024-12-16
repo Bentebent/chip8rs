@@ -4,9 +4,12 @@ use std::{
     io::Read,
 };
 
-use color_eyre::eyre::{
-    eyre,
-    Result,
+use color_eyre::{
+    eyre::{
+        eyre,
+        Result,
+    },
+    owo_colors::OwoColorize,
 };
 use macroquad::{
     camera::{
@@ -74,6 +77,10 @@ impl ProgramCounter {
     pub fn increment(&mut self) {
         self.0 += 2;
         self.0 %= constants::RAM_SIZE;
+    }
+
+    pub fn decrement(&mut self) {
+        self.0 -= 2;
     }
 
     pub fn jump<T: Into<usize>>(&mut self, address: T) {
@@ -368,6 +375,9 @@ impl Emulator {
             }
             (_, 0xF000) if instruction_data.nn == 0x1E => {
                 process::op_FX1E(&self.register, instruction_data.x, &mut self.index_register);
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF00A => {
+                process::op_FX0A(&mut self.pc);
             }
             (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF029 => {
                 process::op_FX29(&self.register, &mut self.index_register, instruction_data.x);
