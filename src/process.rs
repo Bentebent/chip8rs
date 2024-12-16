@@ -12,12 +12,15 @@ use macroquad::{
     window::clear_background,
 };
 
-use crate::emulator::{
-    InstructionData,
-    Interpreter,
-    ProgramCounter,
-    Ram,
-    Register,
+use crate::{
+    constants,
+    emulator::{
+        InstructionData,
+        Interpreter,
+        ProgramCounter,
+        Ram,
+        Register,
+    },
 };
 
 pub fn op_00E0(camera: &Camera2D, color: Color, ram: &mut Ram) {
@@ -154,6 +157,7 @@ pub fn DXYN(
 
     set_camera(camera);
     let sprite_height = instruction.n;
+    let mut bit_flipped_off = false;
     for y_coord in 0..sprite_height {
         let sprite = memory.get(index_register + y_coord);
         let screen_pos_y = start_y + y_coord as i32;
@@ -175,7 +179,8 @@ pub fn DXYN(
             }
 
             // Calculate the display bit index and position
-            let display_bit_idx = (screen_pos_y * window_size.0 + screen_pos_x) as u32;
+            let display_bit_idx =
+                (constants::DISPLAY_RANGE.0 as u32 * 8) + (screen_pos_y * window_size.0 + screen_pos_x) as u32;
             let display_byte_idx = display_bit_idx / 8; // 8 bits in a byte
             let display_bit_pos = (display_bit_idx % 8) as u8;
 
@@ -184,7 +189,7 @@ pub fn DXYN(
             let display_bit = (*display_byte >> display_bit_pos) & 1;
 
             if display_bit == 1 {
-                *register.get_mut("VF") = 1; // Set VF if a pixel is flipped off
+                bit_flipped_off = true;
             }
             *display_byte ^= 1 << display_bit_pos;
 
@@ -209,6 +214,8 @@ pub fn DXYN(
             );
         }
     }
+
+    *register.get_mut("VF") = bit_flipped_off as u8; // Set VF if a pixel is flipped off
 }
 
 pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) {
@@ -225,6 +232,11 @@ pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8) {
 
 pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
     *index_register = index_register.wrapping_add(register.get(&x) as u16);
+}
+
+pub fn op_FX29(register: &Register, index_register: &mut u16, x: String) {
+    let font_char = register.get(&x);
+    println!("{:X}", font_char);
 }
 
 pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register: u16) {

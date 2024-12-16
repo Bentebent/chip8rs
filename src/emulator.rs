@@ -38,6 +38,27 @@ use crate::{
     process,
 };
 
+#[rustfmt::skip]
+const FONT: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
+
 #[allow(dead_code)]
 pub enum Interpreter {
     CosmacVIP,
@@ -65,6 +86,12 @@ pub struct Ram {
 }
 
 impl Ram {
+    fn load(rom: Rom) -> Self {
+        let mut ram: Ram = rom.into();
+        ram.memory[0..FONT.len()].copy_from_slice(&FONT);
+
+        ram
+    }
     fn op_code(&self, pc: &ProgramCounter) -> u16 {
         (self.memory[*pc.inner()] as u16) << 8 | (self.memory[pc.inner() + 1] as u16)
     }
@@ -203,7 +230,7 @@ impl Emulator {
 
         Self {
             interpreter: Interpreter::SuperChip,
-            memory: rom.into(),
+            memory: Ram::load(rom),
             pc: ProgramCounter(constants::MEMORY_OFFSET),
             stack: vec![],
             register: Register::new(),
@@ -341,6 +368,9 @@ impl Emulator {
             }
             (_, 0xF000) if instruction_data.nn == 0x1E => {
                 process::op_FX1E(&self.register, instruction_data.x, &mut self.index_register);
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF029 => {
+                process::op_FX29(&self.register, &mut self.index_register, instruction_data.x);
             }
             (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF033 => {
                 process::op_FX33(
