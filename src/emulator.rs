@@ -9,12 +9,23 @@ use color_eyre::eyre::{
     Result,
 };
 use macroquad::{
+    audio::{
+        load_sound,
+        play_sound,
+        stop_sound,
+        PlaySoundParams,
+        Sound,
+    },
     camera::{
         set_default_camera,
         Camera2D,
     },
     color::{
         self,
+    },
+    input::{
+        is_key_pressed,
+        KeyCode,
     },
     math::vec2,
     prelude::{
@@ -208,6 +219,42 @@ impl Register {
     }
 }
 
+pub struct KeyPad {
+    key_code_hex_mapping: HashMap<KeyCode, u8>,
+}
+
+impl KeyPad {
+    fn new() -> Self {
+        let key_code_hex_mapping: HashMap<KeyCode, u8> = HashMap::from([
+            (KeyCode::Key1, 0x1),
+            (KeyCode::Key2, 0x2),
+            (KeyCode::Key3, 0x3),
+            (KeyCode::Key4, 0xC),
+            (KeyCode::Q, 0x4),
+            (KeyCode::W, 0x5),
+            (KeyCode::E, 0x6),
+            (KeyCode::R, 0xD),
+            (KeyCode::A, 0x7),
+            (KeyCode::S, 0x8),
+            (KeyCode::D, 0x9),
+            (KeyCode::F, 0xE),
+            (KeyCode::Z, 0xA),
+            (KeyCode::X, 0x0),
+            (KeyCode::C, 0xB),
+            (KeyCode::V, 0xF),
+        ]);
+
+        Self { key_code_hex_mapping }
+    }
+
+    pub fn get_key_pressed(&self) -> Option<u8> {
+        self.key_code_hex_mapping
+            .iter()
+            .find(|(code, _)| is_key_pressed(**code))
+            .map(|(_, hex)| *hex)
+    }
+}
+
 pub struct Emulator {
     interpreter: Interpreter,
     memory: Ram,
@@ -217,14 +264,16 @@ pub struct Emulator {
     index_register: u16,
     delay_timer: u8,
     sound_timer: u8,
+    keypad: KeyPad,
     pixel_size: i32,
     window_size: (i32, i32),
     render_target: RenderTarget,
     camera: Camera2D,
+    sound: Sound,
 }
 
 impl Emulator {
-    pub fn start(rom: Rom, pixel_size: i32, window_size: (i32, i32)) -> Self {
+    pub fn start(rom: Rom, pixel_size: i32, window_size: (i32, i32), beep: Sound) -> Self {
         let render_target = render_target((pixel_size * window_size.0) as u32, (pixel_size * window_size.1) as u32);
         render_target
             .texture
@@ -241,10 +290,12 @@ impl Emulator {
             index_register: 0,
             delay_timer: 0,
             sound_timer: 0,
+            keypad: KeyPad::new(),
             pixel_size,
             window_size,
             render_target,
             camera,
+            sound: beep,
         }
     }
 
@@ -367,14 +418,19 @@ impl Emulator {
             (_, 0xF000) if instruction_data.nn == 0xF => {
                 process::op_FX15(&mut self.register, instruction_data.x, &mut self.delay_timer);
             }
-            (_, 0xF000) if instruction_data.n == 0x12 => {
-                process::op_FX18(&mut self.register, instruction_data.x, &mut self.sound_timer);
-            }
             (_, 0xF000) if instruction_data.nn == 0x1E => {
                 process::op_FX1E(&self.register, instruction_data.x, &mut self.index_register);
             }
             (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF00A => {
-                process::op_FX0A(&mut self.pc);
+                process::op_FX0A(&mut self.register, &mut self.pc, &self.keypad, instruction_data.x);
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF018 => {
+                process::op_FX18(
+                    &mut self.register,
+                    instruction_data.x,
+                    &mut self.sound_timer,
+                    &self.sound,
+                );
             }
             (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF029 => {
                 process::op_FX29(&self.register, &mut self.index_register, instruction_data.x);
@@ -409,6 +465,13 @@ impl Emulator {
         }
     }
 
+    pub fn beep(&mut self) {
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+        } else {
+            stop_sound(&self.sound);
+        }
+    }
     pub async fn render(&self) {
         set_default_camera();
         draw_texture_ex(

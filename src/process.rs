@@ -1,5 +1,10 @@
 #![allow(non_snake_case)]
 use macroquad::{
+    audio::{
+        play_sound,
+        PlaySoundParams,
+        Sound,
+    },
     camera::{
         set_camera,
         Camera2D,
@@ -17,6 +22,7 @@ use crate::{
     emulator::{
         InstructionData,
         Interpreter,
+        KeyPad,
         ProgramCounter,
         Ram,
         Register,
@@ -224,18 +230,32 @@ pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) {
 
 pub fn op_FX15(register: &mut Register, x: String, delay_timer: &mut u8) {
     *delay_timer = register.get(&x);
+    println!("delay");
 }
 
-pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8) {
+pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8, sound: &Sound) {
     *sound_timer = register.get(&x);
+
+    play_sound(
+        sound,
+        PlaySoundParams {
+            looped: true,
+            volume: 0.5,
+        },
+    );
 }
 
 pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
     *index_register = index_register.wrapping_add(register.get(&x) as u16);
 }
 
-pub fn op_FX0A(pc: &mut ProgramCounter) {
-    pc.decrement();
+pub fn op_FX0A(register: &mut Register, pc: &mut ProgramCounter, keypad: &KeyPad, x: String) {
+    if let Some(key_hex) = keypad.get_key_pressed() {
+        println!("{:X}", key_hex);
+        *register.get_mut(&x) = key_hex;
+    } else {
+        pc.decrement();
+    }
 }
 
 pub fn op_FX29(register: &Register, index_register: &mut u16, x: String) {
