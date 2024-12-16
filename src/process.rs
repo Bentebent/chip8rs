@@ -202,10 +202,10 @@ pub fn DXYN(
             // Determine the color and draw the pixel
             let color = if (*display_byte >> display_bit_pos) & 1 == 1 {
                 color::Color {
-                    r: 0.,
+                    r: 0.0,
                     g: 128.0,
-                    b: 0.,
-                    a: 1.,
+                    b: 0.0,
+                    a: 1.0,
                 }
             } else {
                 color::BLACK
@@ -224,25 +224,36 @@ pub fn DXYN(
     *register.get_mut("VF") = bit_flipped_off as u8; // Set VF if a pixel is flipped off
 }
 
+pub fn op_EX9E(register: &Register, keypad: &KeyPad, pc: &mut ProgramCounter, x: String) {
+    if keypad.is_key_pressed(register.get(&x)) {
+        pc.increment();
+    }
+}
+
+pub fn op_EXA1(register: &Register, keypad: &KeyPad, pc: &mut ProgramCounter, x: String) {
+    if !keypad.is_key_pressed(register.get(&x)) {
+        pc.increment();
+    }
+}
 pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) {
     *register.get_mut(&x) = *delay_timer;
 }
 
 pub fn op_FX15(register: &mut Register, x: String, delay_timer: &mut u8) {
     *delay_timer = register.get(&x);
-    println!("delay");
 }
 
 pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8, sound: &Sound) {
+    if *sound_timer == 0 {
+        play_sound(
+            sound,
+            PlaySoundParams {
+                looped: true,
+                volume: 0.5,
+            },
+        );
+    }
     *sound_timer = register.get(&x);
-
-    play_sound(
-        sound,
-        PlaySoundParams {
-            looped: true,
-            volume: 0.5,
-        },
-    );
 }
 
 pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
@@ -250,8 +261,7 @@ pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
 }
 
 pub fn op_FX0A(register: &mut Register, pc: &mut ProgramCounter, keypad: &KeyPad, x: String) {
-    if let Some(key_hex) = keypad.get_key_pressed() {
-        println!("{:X}", key_hex);
+    if let Some(key_hex) = keypad.get_key_released() {
         *register.get_mut(&x) = key_hex;
     } else {
         pc.decrement();
@@ -274,8 +284,7 @@ pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register:
 }
 
 pub fn op_FX55(interpreter: &Interpreter, register: &Register, memory: &mut Ram, index_register: &mut u16, x: String) {
-    let range: u16 = x[1..].parse().unwrap();
-
+    let range: u16 = u16::from_str_radix(&x[1..], 16).unwrap();
     for i in 0..=range {
         let addr = if let Interpreter::CosmacVIP = interpreter {
             *index_register += i;

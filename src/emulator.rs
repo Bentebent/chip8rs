@@ -10,10 +10,7 @@ use color_eyre::eyre::{
 };
 use macroquad::{
     audio::{
-        load_sound,
-        play_sound,
         stop_sound,
-        PlaySoundParams,
         Sound,
     },
     camera::{
@@ -24,7 +21,8 @@ use macroquad::{
         self,
     },
     input::{
-        is_key_pressed,
+        is_key_down,
+        is_key_released,
         KeyCode,
     },
     math::vec2,
@@ -220,38 +218,45 @@ impl Register {
 }
 
 pub struct KeyPad {
-    key_code_hex_mapping: HashMap<KeyCode, u8>,
+    key_code_hex_mapping: HashMap<u8, KeyCode>,
 }
 
 impl KeyPad {
     fn new() -> Self {
-        let key_code_hex_mapping: HashMap<KeyCode, u8> = HashMap::from([
-            (KeyCode::Key1, 0x1),
-            (KeyCode::Key2, 0x2),
-            (KeyCode::Key3, 0x3),
-            (KeyCode::Key4, 0xC),
-            (KeyCode::Q, 0x4),
-            (KeyCode::W, 0x5),
-            (KeyCode::E, 0x6),
-            (KeyCode::R, 0xD),
-            (KeyCode::A, 0x7),
-            (KeyCode::S, 0x8),
-            (KeyCode::D, 0x9),
-            (KeyCode::F, 0xE),
-            (KeyCode::Z, 0xA),
-            (KeyCode::X, 0x0),
-            (KeyCode::C, 0xB),
-            (KeyCode::V, 0xF),
+        let key_code_hex_mapping: HashMap<u8, KeyCode> = HashMap::from([
+            (0x1, KeyCode::Key1),
+            (0x2, KeyCode::Key2),
+            (0x3, KeyCode::Key3),
+            (0xC, KeyCode::Key4),
+            (0x4, KeyCode::Q),
+            (0x5, KeyCode::W),
+            (0x6, KeyCode::E),
+            (0xD, KeyCode::R),
+            (0x7, KeyCode::A),
+            (0x8, KeyCode::S),
+            (0x9, KeyCode::D),
+            (0xE, KeyCode::F),
+            (0xA, KeyCode::Z),
+            (0x0, KeyCode::X),
+            (0xB, KeyCode::C),
+            (0xF, KeyCode::V),
         ]);
 
         Self { key_code_hex_mapping }
     }
 
-    pub fn get_key_pressed(&self) -> Option<u8> {
+    pub fn get_key_released(&self) -> Option<u8> {
         self.key_code_hex_mapping
             .iter()
-            .find(|(code, _)| is_key_pressed(**code))
-            .map(|(_, hex)| *hex)
+            .find(|(_, code)| is_key_released(**code))
+            .map(|(hex, _)| *hex)
+    }
+    pub fn is_key_pressed(&self, hex: u8) -> bool {
+        if let Some(key_code) = self.key_code_hex_mapping.get(&hex) {
+            is_key_down(*key_code)
+        } else {
+            false
+        }
     }
 }
 
@@ -411,11 +416,17 @@ impl Emulator {
                     instruction_data,
                 );
             }
-            (_, 0xF000) if instruction_data.n == 0x7 => {
+            (_, 0xE000) if instruction_data.op_code & 0xF0FF == 0xE09E => {
+                process::op_EX9E(&self.register, &self.keypad, &mut self.pc, instruction_data.x);
+            }
+            (_, 0xE000) if instruction_data.op_code & 0xF0FF == 0xE0A1 => {
+                process::op_EXA1(&self.register, &self.keypad, &mut self.pc, instruction_data.x);
+            }
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF007 => {
                 process::op_FX07(&mut self.register, instruction_data.x, &self.delay_timer);
             }
 
-            (_, 0xF000) if instruction_data.nn == 0xF => {
+            (_, 0xF000) if instruction_data.op_code & 0xF0FF == 0xF015 => {
                 process::op_FX15(&mut self.register, instruction_data.x, &mut self.delay_timer);
             }
             (_, 0xF000) if instruction_data.nn == 0x1E => {
@@ -470,6 +481,11 @@ impl Emulator {
             self.sound_timer -= 1;
         } else {
             stop_sound(&self.sound);
+        }
+    }
+    pub fn tick_delay(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
         }
     }
     pub async fn render(&self) {

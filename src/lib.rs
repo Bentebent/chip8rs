@@ -1,11 +1,18 @@
-use std::time::{
-    SystemTime,
-    UNIX_EPOCH,
+use std::{
+    thread,
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
 use color_eyre::eyre::Result;
 use macroquad::{
-    audio::load_sound,
+    audio::{
+        load_sound,
+        play_sound,
+        PlaySoundParams,
+    },
     input::{
         is_key_pressed,
         KeyCode,
@@ -19,23 +26,36 @@ mod process;
 pub async fn run(path: String, pixel_size: i32, window_size: (i32, i32)) -> Result<()> {
     let rom = emulator::Rom::load(path)?;
     let sound = load_sound(r"assets/beep.wav").await?;
+
+    play_sound(
+        &sound,
+        PlaySoundParams {
+            looped: false,
+            volume: 0.0, // Muted
+        },
+    );
+
+    thread::sleep(Duration::new(1, 0));
+
     let mut emulator = emulator::Emulator::start(rom, pixel_size, window_size, sound);
-    let mut t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;
-    let mut t_sound = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;
+
+    let start = Instant::now();
+    let mut t = start;
+    let mut t_sound = start;
 
     loop {
-        let t2 = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;
-        if t2 - t_sound > constants::MS_60HZ {
-            t_sound = t2;
+        let now = Instant::now();
+        if now.duration_since(t_sound).as_secs_f64() * 1000.0 > constants::MS_60HZ {
+            t_sound = now;
             emulator.beep();
+            emulator.tick_delay();
         }
-        if t2 - t > constants::MS_PER_INSTRUCTION {
+        if now.duration_since(t).as_secs_f64() * 1000.0 > constants::MS_PER_INSTRUCTION {
+            t = now;
             emulator.run().await;
-            t = t2;
-
-            emulator.render().await
         }
 
+        emulator.render().await;
         if is_key_pressed(KeyCode::Escape) {
             break;
         }
