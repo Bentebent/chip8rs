@@ -385,4 +385,8 @@ impl Emulator {
 
         next_frame().await
     }
+
+    pub fn export_render_target(&self, path: &str) {
+        self.render_target.texture.get_texture_data().export_png(path);
+    }
 }
