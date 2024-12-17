@@ -22,6 +22,10 @@ jobs:
           rustup component add --toolchain nightly rustfmt
           rustup default stable
 
+      - name: Install port audio
+        run: |
+          sudo apt-get -y install libasound2-dev
+
       - name: Run fmt
         if: always()
         run: cargo +nightly fmt -- --check
