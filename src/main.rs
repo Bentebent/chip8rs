@@ -23,7 +23,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     #[allow(unused_variables)]
-    let path = r"roms/IBM Logo.ch8";
+    let path = r"assets/roms/IBM Logo.ch8";
     //let path = r"roms/test_flags.ch8";
     //let path = r"roms/test_opcode.ch8";
     //let path = r"roms/addition_problems.ch8";

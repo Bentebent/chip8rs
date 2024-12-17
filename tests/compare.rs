@@ -61,8 +61,9 @@ mod test {
 
     #[macroquad::test]
     async fn compare_ibm() {
+        env::set_var("RUST_BACKTRACE", "1");
         let generated_identifier: String = env::var("GIT_SHA").unwrap_or("local".to_string());
-        let path = r"roms/IBM Logo.ch8";
+        let path = r"assets/roms/IBM Logo.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
             Box::new(move |emulator| {
