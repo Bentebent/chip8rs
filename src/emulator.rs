@@ -159,7 +159,7 @@ impl KeyPad {
 }
 
 #[derive(Error, Debug)]
-pub enum EmulatorError {
+pub(crate) enum EmulatorError {
     #[error("failed processing op code 0x{:04X}", op_code)]
     OpError { source: ProcessingError, op_code: u16 },
 
@@ -198,7 +198,7 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn start(rom: Rom, pixel_size: i32, window_size: (i32, i32), beep: Sound) -> Self {
+    pub(crate) fn start(rom: Rom, pixel_size: i32, window_size: (i32, i32), beep: Sound) -> Self {
         let material = load_material(
             ShaderSource::Glsl {
                 vertex: &fs::read_to_string("assets/crt_vert.glsl").expect("Vertex shader missing"),
@@ -232,7 +232,7 @@ impl Emulator {
         }
     }
 
-    pub async fn run(&mut self) -> Result<(), EmulatorError> {
+    pub(crate) async fn run(&mut self) -> Result<(), EmulatorError> {
         let op_code = self.memory.op_code(&self.pc).map_err(|err| EmulatorError::PCInvalid {
             pc: self.pc.clone(),
             source: err,
@@ -391,8 +391,8 @@ impl Emulator {
         gl_use_material(&self.crt_material);
         draw_texture_ex(
             &self.render_target.texture,
-            self.window_size.0 as f32 / 2.0,
-            self.window_size.1 as f32 / 2.0,
+            0.,
+            0.,
             macroquad::color::WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(screen_width(), screen_height())),

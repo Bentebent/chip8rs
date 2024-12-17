@@ -153,7 +153,7 @@ pub(crate) struct Rom {
 }
 
 impl Rom {
-    pub fn load(path: String) -> Result<Self, RomError> {
+    pub fn load(path: &str) -> Result<Self, RomError> {
         let mut file = File::open(path)?;
         let mut data = vec![];
 
