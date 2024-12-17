@@ -13,8 +13,8 @@ fn window_conf() -> Conf {
         window_title: String::from("chip8.rs"),
         fullscreen: false,
         window_resizable: false,
-        window_width: SCREEN_WIDTH * PIXEL_SIZE,
-        window_height: SCREEN_HEIGHT * PIXEL_SIZE,
+        window_width: SCREEN_WIDTH * PIXEL_SIZE + SCREEN_WIDTH,
+        window_height: SCREEN_HEIGHT * PIXEL_SIZE + SCREEN_HEIGHT,
 
         platform: miniquad::conf::Platform { ..Default::default() },
         ..Default::default()
@@ -24,12 +24,12 @@ fn window_conf() -> Conf {
 async fn main() {
     #[allow(unused_variables)]
     let path = r"roms/IBM Logo.ch8";
-    //let path = r"roms/test_flags.ch8";
-    //let path = r"roms/test_opcode.ch8";
+    let path = r"roms/test_flags.ch8";
+    let path = r"roms/test_opcode.ch8";
     //let path = r"roms/addition_problems.ch8";
     //let path = r"roms/random_number.ch8";
     //let path = r"roms/beep.ch8";
-    //let path = r"roms/beep.ch8";
+    let path = r"roms/astro_dodge.ch8";
     if let Err(error) = chip8rs::run(path.into(), PIXEL_SIZE, (SCREEN_WIDTH, SCREEN_HEIGHT)).await {
         println!("Chip8 emulator failed in an unexpected manner: {}", error)
     }

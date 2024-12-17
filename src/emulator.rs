@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fs,
+};
 
 use macroquad::{
     audio::{
@@ -17,9 +20,14 @@ use macroquad::{
     },
     math::vec2,
     prelude::{
+        gl_use_default_material,
+        gl_use_material,
+        load_material,
         next_frame,
         render_target,
+        Material,
         Rect,
+        ShaderSource,
     },
     texture::{
         draw_texture_ex,
@@ -186,17 +194,25 @@ pub struct Emulator {
     render_target: RenderTarget,
     camera: Camera2D,
     sound: Sound,
+    crt_material: Material,
 }
 
 impl Emulator {
     pub fn start(rom: Rom, pixel_size: i32, window_size: (i32, i32), beep: Sound) -> Self {
+        let material = load_material(
+            ShaderSource::Glsl {
+                vertex: &fs::read_to_string("assets/crt_vert.glsl").expect("Vertex shader missing"),
+                fragment: &fs::read_to_string("assets/crt_frag.glsl").expect("Fragment shader missing"),
+            },
+            Default::default(),
+        )
+        .expect("Failed to create post processing material");
         let render_target = render_target((pixel_size * window_size.0) as u32, (pixel_size * window_size.1) as u32);
         render_target
             .texture
             .set_filter(macroquad::texture::FilterMode::Nearest);
         let mut camera = Camera2D::from_display_rect(Rect::new(0., 0., screen_width(), screen_height()));
         camera.render_target = Some(render_target.clone());
-
         Self {
             interpreter: Interpreter::SuperChip,
             memory: Ram::load(rom, &FONT),
@@ -212,6 +228,7 @@ impl Emulator {
             render_target,
             camera,
             sound: beep,
+            crt_material: material,
         }
     }
 
@@ -371,10 +388,11 @@ impl Emulator {
     }
     pub async fn render(&self) {
         set_default_camera();
+        gl_use_material(&self.crt_material);
         draw_texture_ex(
             &self.render_target.texture,
-            0.,
-            0.,
+            self.window_size.0 as f32 / 2.0,
+            self.window_size.1 as f32 / 2.0,
             macroquad::color::WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(screen_width(), screen_height())),
@@ -382,6 +400,7 @@ impl Emulator {
                 ..Default::default()
             },
         );
+        gl_use_default_material();
 
         next_frame().await
     }
