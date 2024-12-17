@@ -1,4 +1,6 @@
 #![allow(non_snake_case)]
+use std::num::ParseIntError;
+
 use macroquad::{
     audio::{
         play_sound,
@@ -16,6 +18,7 @@ use macroquad::{
     shapes::draw_rectangle,
     window::clear_background,
 };
+use thiserror::Error;
 
 use crate::{
     constants,
@@ -24,10 +27,43 @@ use crate::{
         Interpreter,
         KeyPad,
         ProgramCounter,
+    },
+    mem::{
+        AddressStack,
         Ram,
+        RamError,
         Register,
+        RegisterError,
+        StackEmptyError,
     },
 };
+
+#[derive(Error, Debug)]
+pub(crate) enum ProcessingError {
+    #[error("invalid register {source:?}")]
+    RegisterError {
+        #[from]
+        source: RegisterError,
+    },
+
+    #[error("invalid hex value {source:?}")]
+    HexParseError {
+        #[from]
+        source: ParseIntError,
+    },
+
+    #[error("invalid jump")]
+    JumpOutOfBounds {
+        #[from]
+        source: StackEmptyError,
+    },
+
+    #[error("invalid memory address")]
+    AddressOutOfBounds {
+        #[from]
+        source: RamError,
+    },
+}
 
 pub fn op_00E0(camera: &Camera2D, color: Color, ram: &mut Ram) {
     set_camera(camera);
@@ -35,117 +71,150 @@ pub fn op_00E0(camera: &Camera2D, color: Color, ram: &mut Ram) {
     ram.reset_vram();
 }
 
-pub fn op_00EE(pc: &mut ProgramCounter, stack: &mut Vec<u16>) {
-    pc.jump(stack.pop().unwrap() as usize);
+pub fn op_00EE(pc: &mut ProgramCounter, stack: &mut AddressStack) -> Result<(), ProcessingError> {
+    pc.jump(stack.pop::<usize>()?);
+    Ok(())
 }
 
 pub fn op_1NNN(pc: &mut ProgramCounter, nnn: u16) {
     pc.jump(nnn);
 }
 
-pub fn op_2NNN(stack: &mut Vec<u16>, pc: &mut ProgramCounter, nnn: u16) {
+pub fn op_2NNN(stack: &mut AddressStack, pc: &mut ProgramCounter, nnn: u16) {
     stack.push(*pc.inner() as u16);
     pc.jump(nnn);
 }
 
-pub fn op_3XNN(register: &Register, x: String, nn: u8, pc: &mut ProgramCounter) {
-    if register.get(&x) == nn {
+pub fn op_3XNN(register: &Register, x: String, nn: u8, pc: &mut ProgramCounter) -> Result<(), ProcessingError> {
+    if register.get(&x)? == nn {
         pc.increment();
     }
+
+    Ok(())
 }
 
-pub fn op_4XNN(register: &Register, x: String, nn: u8, pc: &mut ProgramCounter) {
-    if register.get(&x) != nn {
+pub fn op_4XNN(register: &Register, x: String, nn: u8, pc: &mut ProgramCounter) -> Result<(), ProcessingError> {
+    if register.get(&x)? != nn {
         pc.increment();
     }
+    Ok(())
 }
 
-pub fn op_5XNN(register: &Register, x: String, y: String, pc: &mut ProgramCounter) {
-    if register.get(&x) == register.get(&y) {
+pub fn op_5XNN(register: &Register, x: String, y: String, pc: &mut ProgramCounter) -> Result<(), ProcessingError> {
+    if register.cmp_registers(&x, &y)? {
         pc.increment();
     }
+    Ok(())
 }
 
-pub fn op_6XNN(register: &mut Register, x: String, nn: u8) {
-    *register.get_mut(&x) = nn;
+pub fn op_6XNN(register: &mut Register, x: String, nn: u8) -> Result<(), ProcessingError> {
+    register.set(&x, nn)?;
+    Ok(())
 }
 
-pub fn op_7XNN(register: &mut Register, x: String, nn: u8) {
-    let register_value = register.get(&x);
-    let new_value = register_value.wrapping_add(nn);
-    *register.get_mut(&x) = new_value;
+pub fn op_7XNN(register: &mut Register, x: String, nn: u8) -> Result<(), ProcessingError> {
+    register.set(&x, register.get(&x)?.wrapping_add(nn))?;
+    Ok(())
 }
 
-pub fn op_8XY0(register: &mut Register, x: String, y: String) {
-    *register.get_mut(&x) = register.get(&y);
+pub fn op_8XY0(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    register.set_x_y(&x, &y)?;
+    Ok(())
 }
 
-pub fn op_8XY1(register: &mut Register, x: String, y: String) {
-    *register.get_mut(&x) |= register.get(&y);
+pub fn op_8XY1(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    *register.get_mut(&x)? |= register.get(&y)?;
+    Ok(())
 }
-pub fn op_8XY2(register: &mut Register, x: String, y: String) {
-    *register.get_mut(&x) &= register.get(&y);
+pub fn op_8XY2(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    *register.get_mut(&x)? &= register.get(&y)?;
+    Ok(())
 }
-pub fn op_8XY3(register: &mut Register, x: String, y: String) {
-    *register.get_mut(&x) ^= register.get(&y);
+pub fn op_8XY3(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    *register.get_mut(&x)? ^= register.get(&y)?;
+    Ok(())
 }
-pub fn op_8XY4(register: &mut Register, x: String, y: String) {
-    let (val, overflow) = register.get(&x).overflowing_add(register.get(&y));
-    *register.get_mut(&x) = val;
-    *register.get_mut("VF") = overflow as u8;
+pub fn op_8XY4(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    let (val, overflow) = register.get(&x)?.overflowing_add(register.get(&y)?);
+    register.set(&x, val)?;
+    register.set("VF", overflow as u8)?;
+    Ok(())
 }
-pub fn op_8XY5(register: &mut Register, x: String, y: String) {
-    let (val, overflow) = register.get(&x).overflowing_sub(register.get(&y));
-    *register.get_mut(&x) = val;
-    *register.get_mut("VF") = !overflow as u8;
+pub fn op_8XY5(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    let (val, overflow) = register.get(&x)?.overflowing_sub(register.get(&y)?);
+    register.set(&x, val)?;
+    register.set("VF", !overflow as u8)?;
+    Ok(())
 }
-pub fn op_8XY6(interpreter: &Interpreter, register: &mut Register, x: String, y: String) {
+pub fn op_8XY6(
+    interpreter: &Interpreter,
+    register: &mut Register,
+    x: String,
+    y: String,
+) -> Result<(), ProcessingError> {
     if let Interpreter::CosmacVIP = interpreter {
-        *register.get_mut(&x) = register.get(&y);
+        *register.get_mut(&x)? = register.get(&y)?;
     }
-    let lsb = register.get(&x) & 1;
-    *register.get_mut(&x) >>= 1;
-    *register.get_mut("VF") = lsb;
+    let lsb = register.get(&x)? & 1;
+    *register.get_mut(&x)? >>= 1;
+    register.set("VF", lsb)?;
+    Ok(())
 }
 
-pub fn op_8XY7(register: &mut Register, x: String, y: String) {
-    let (val, overflow) = register.get(&y).overflowing_sub(register.get(&x));
-    *register.get_mut(&x) = val;
-    *register.get_mut("VF") = !overflow as u8;
+pub fn op_8XY7(register: &mut Register, x: String, y: String) -> Result<(), ProcessingError> {
+    let (val, overflow) = register.get(&y)?.overflowing_sub(register.get(&x)?);
+    register.set(&x, val)?;
+    register.set("VF", !overflow as u8)?;
+    Ok(())
 }
 
-pub fn op_8XYE(interpreter: &Interpreter, register: &mut Register, x: String, y: String) {
+pub fn op_8XYE(
+    interpreter: &Interpreter,
+    register: &mut Register,
+    x: String,
+    y: String,
+) -> Result<(), ProcessingError> {
     if let Interpreter::CosmacVIP = interpreter {
-        *register.get_mut(&x) = register.get(&y);
+        register.set_x_y(&x, &y)?;
     }
-    let msb = (register.get(&x) >> 7) & 1;
-    *register.get_mut(&x) <<= 1;
-    *register.get_mut("VF") = msb;
+    let msb = (register.get(&x)? >> 7) & 1;
+    *register.get_mut(&x)? <<= 1;
+    register.set("VF", msb)?;
+    Ok(())
 }
 
-pub fn op_9XY0(register: &Register, x: String, y: String, pc: &mut ProgramCounter) {
-    if register.get(&x) != register.get(&y) {
+pub fn op_9XY0(register: &Register, x: String, y: String, pc: &mut ProgramCounter) -> Result<(), ProcessingError> {
+    if !register.cmp_registers(&x, &y)? {
         pc.increment();
     }
+    Ok(())
 }
 
 pub fn op_ANNN(index_register: &mut u16, nnn: u16) {
     *index_register = nnn;
 }
 
-pub fn op_BNNN(interpreter: &Interpreter, register: &Register, pc: &mut ProgramCounter, x: String, nnn: u16) {
+pub fn op_BNNN(
+    interpreter: &Interpreter,
+    register: &Register,
+    pc: &mut ProgramCounter,
+    x: String,
+    nnn: u16,
+) -> Result<(), ProcessingError> {
     match interpreter {
         Interpreter::CosmacVIP => {
-            pc.jump(nnn + register.get("V0") as u16);
+            pc.jump(nnn + register.get("V0")? as u16);
         }
         Interpreter::Chip48 | Interpreter::SuperChip => {
-            pc.jump(nnn + register.get(&x) as u16);
+            pc.jump(nnn + register.get(&x)? as u16);
         }
     }
+    Ok(())
 }
 
-pub fn op_CXNN(register: &mut Register, x: String, nn: u8) {
-    *register.get_mut(&x) = rand::random::<u8>() & nn;
+pub fn op_CXNN(register: &mut Register, x: String, nn: u8) -> Result<(), ProcessingError> {
+    register.set(&x, rand::random::<u8>() & nn)?;
+    Ok(())
 }
 
 pub fn DXYN(
@@ -156,16 +225,16 @@ pub fn DXYN(
     window_size: &(i32, i32),
     pixel_size: i32,
     instruction: InstructionData,
-) {
-    let start_x = (register.get(&instruction.x) as i32) % window_size.0;
-    let start_y = (register.get(&instruction.y) as i32) % window_size.1;
-    *register.get_mut("VF") = 0;
+) -> Result<(), ProcessingError> {
+    let start_x = (register.get(&instruction.x)? as i32) % window_size.0;
+    let start_y = (register.get(&instruction.y)? as i32) % window_size.1;
+    register.set("VF", 0)?;
 
     set_camera(camera);
     let sprite_height = instruction.n;
     let mut bit_flipped_off = false;
     for y_coord in 0..sprite_height {
-        let sprite = memory.get(index_register + y_coord);
+        let sprite = memory.get(index_register + y_coord)?;
         let screen_pos_y = start_y + y_coord as i32;
 
         if screen_pos_y >= window_size.1 {
@@ -191,7 +260,7 @@ pub fn DXYN(
             let display_bit_pos = (display_bit_idx % 8) as u8;
 
             // Modify the display byte
-            let display_byte = memory.get_mut(display_byte_idx as usize);
+            let display_byte = memory.get_mut(display_byte_idx as usize)?;
             let display_bit = (*display_byte >> display_bit_pos) & 1;
 
             if display_bit == 1 {
@@ -221,29 +290,46 @@ pub fn DXYN(
         }
     }
 
-    *register.get_mut("VF") = bit_flipped_off as u8; // Set VF if a pixel is flipped off
+    // Set VF if a pixel is flipped off
+    register.set("VF", bit_flipped_off as u8)?;
+    Ok(())
 }
 
-pub fn op_EX9E(register: &Register, keypad: &KeyPad, pc: &mut ProgramCounter, x: String) {
-    if keypad.is_key_pressed(register.get(&x)) {
+pub fn op_EX9E(
+    register: &Register,
+    keypad: &KeyPad,
+    pc: &mut ProgramCounter,
+    x: String,
+) -> Result<(), ProcessingError> {
+    if keypad.is_key_pressed(register.get(&x)?) {
         pc.increment();
     }
+    Ok(())
 }
 
-pub fn op_EXA1(register: &Register, keypad: &KeyPad, pc: &mut ProgramCounter, x: String) {
-    if !keypad.is_key_pressed(register.get(&x)) {
+pub fn op_EXA1(
+    register: &Register,
+    keypad: &KeyPad,
+    pc: &mut ProgramCounter,
+    x: String,
+) -> Result<(), ProcessingError> {
+    if !keypad.is_key_pressed(register.get(&x)?) {
         pc.increment();
     }
+
+    Ok(())
 }
-pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) {
-    *register.get_mut(&x) = *delay_timer;
+pub fn op_FX07(register: &mut Register, x: String, delay_timer: &u8) -> Result<(), ProcessingError> {
+    register.set(&x, *delay_timer)?;
+    Ok(())
 }
 
-pub fn op_FX15(register: &mut Register, x: String, delay_timer: &mut u8) {
-    *delay_timer = register.get(&x);
+pub fn op_FX15(register: &mut Register, x: String, delay_timer: &mut u8) -> Result<(), ProcessingError> {
+    *delay_timer = register.get(&x)?;
+    Ok(())
 }
 
-pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8, sound: &Sound) {
+pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8, sound: &Sound) -> Result<(), ProcessingError> {
     if *sound_timer == 0 {
         play_sound(
             sound,
@@ -253,38 +339,57 @@ pub fn op_FX18(register: &mut Register, x: String, sound_timer: &mut u8, sound: 
             },
         );
     }
-    *sound_timer = register.get(&x);
+    *sound_timer = register.get(&x)?;
+    Ok(())
 }
 
-pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) {
-    *index_register = index_register.wrapping_add(register.get(&x) as u16);
+pub fn op_FX1E(register: &Register, x: String, index_register: &mut u16) -> Result<(), ProcessingError> {
+    *index_register = index_register.wrapping_add(register.get(&x)? as u16);
+    Ok(())
 }
 
-pub fn op_FX0A(register: &mut Register, pc: &mut ProgramCounter, keypad: &KeyPad, x: String) {
+pub fn op_FX0A(
+    register: &mut Register,
+    pc: &mut ProgramCounter,
+    keypad: &KeyPad,
+    x: String,
+) -> Result<(), ProcessingError> {
     if let Some(key_hex) = keypad.get_key_released() {
-        *register.get_mut(&x) = key_hex;
+        register.set(&x, key_hex)?;
     } else {
         pc.decrement();
     }
+
+    Ok(())
 }
 
-pub fn op_FX29(register: &Register, index_register: &mut u16, x: String) {
-    let font_char = register.get(&x);
+pub fn op_FX29(register: &Register, index_register: &mut u16, x: String) -> Result<(), ProcessingError> {
+    let font_char = register.get(&x)?;
     *index_register = (font_char * 5) as u16;
+
+    Ok(())
 }
 
-pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register: u16) {
-    let mut val = register.get(&x);
+pub fn op_FX33(register: &Register, memory: &mut Ram, x: String, index_register: u16) -> Result<(), ProcessingError> {
+    let mut val = register.get(&x)?;
 
     for i in (0..3).rev() {
         let remainder = val % 10;
         val /= 10;
-        *memory.get_mut(index_register + i) = remainder;
+        *memory.get_mut(index_register + i)? = remainder;
     }
+
+    Ok(())
 }
 
-pub fn op_FX55(interpreter: &Interpreter, register: &Register, memory: &mut Ram, index_register: &mut u16, x: String) {
-    let range: u16 = u16::from_str_radix(&x[1..], 16).unwrap();
+pub fn op_FX55(
+    interpreter: &Interpreter,
+    register: &Register,
+    memory: &mut Ram,
+    index_register: &mut u16,
+    x: String,
+) -> Result<(), ProcessingError> {
+    let range: u16 = u16::from_str_radix(&x[1..], 16)?;
     for i in 0..=range {
         let addr = if let Interpreter::CosmacVIP = interpreter {
             *index_register += i;
@@ -292,12 +397,19 @@ pub fn op_FX55(interpreter: &Interpreter, register: &Register, memory: &mut Ram,
         } else {
             *index_register + i
         };
-        *memory.get_mut(addr) = register.get(&format!("V{:X}", i));
+        *memory.get_mut(addr)? = register.get(&format!("V{:X}", i))?;
     }
+    Ok(())
 }
 
-pub fn op_FX65(interpreter: &Interpreter, register: &mut Register, memory: &Ram, index_register: &mut u16, x: String) {
-    let range: u16 = u16::from_str_radix(&x[1..], 16).unwrap();
+pub fn op_FX65(
+    interpreter: &Interpreter,
+    register: &mut Register,
+    memory: &Ram,
+    index_register: &mut u16,
+    x: String,
+) -> Result<(), ProcessingError> {
+    let range: u16 = u16::from_str_radix(&x[1..], 16)?;
     for i in 0..=range {
         let addr = if let Interpreter::CosmacVIP = interpreter {
             *index_register += i;
@@ -305,6 +417,7 @@ pub fn op_FX65(interpreter: &Interpreter, register: &mut Register, memory: &Ram,
         } else {
             *index_register + i
         };
-        *register.get_mut(&format!("V{:X}", i)) = memory.get(addr);
+        register.set(&format!("V{:X}", i), memory.get(addr)?)?;
     }
+    Ok(())
 }

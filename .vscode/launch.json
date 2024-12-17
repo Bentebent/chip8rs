@@ -11,11 +11,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=chip8rs",
+                    "--bin=chip8rs_client",
                     "--package=chip8rs"
                 ],
                 "filter": {
-                    "name": "chip8rs",
+                    "name": "chip8rs_client",
                     "kind": "bin"
                 }
             },
@@ -44,11 +44,11 @@
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=chip8rs",
+                    "--bin=chip8rs_client",
                     "--package=chip8"
                 ],
                 "filter": {
-                    "name": "chip8rs",
+                    "name": "chip8rs_client",
                     "kind": "bin"
                 }
             },
