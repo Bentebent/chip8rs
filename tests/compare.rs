@@ -1,7 +1,6 @@
 mod compare {
 
     use std::{
-        env,
         fs,
         path::Path,
     };
@@ -99,7 +98,11 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert!(1.0 - &comparison_result.score < tolerance);
+        assert!(
+            1.0 - &comparison_result.score < tolerance,
+            "Chip8 logo comparison score too low: {}",
+            comparison_result.score
+        );
     }
 
     async fn compare_ibm(generated_identifier: String, tolerance: f64) {
@@ -121,7 +124,11 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert!(1.0 - &comparison_result.score < tolerance);
+        assert!(
+            1.0 - &comparison_result.score < tolerance,
+            "IBM logo comparison score too low: {}",
+            comparison_result.score
+        );
     }
 
     async fn compare_corax(generated_identifier: String, tolerance: f64) {
@@ -143,7 +150,11 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert!(1.0 - &comparison_result.score < tolerance);
+        assert!(
+            1.0 - &comparison_result.score < tolerance,
+            "Corax+ comparison score too low: {}",
+            comparison_result.score
+        );
     }
 
     async fn compare_flags(generated_identifier: String, tolerance: f64) {
@@ -165,6 +176,10 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert!(1.0 - &comparison_result.score < tolerance);
+        assert!(
+            1.0 - &comparison_result.score < tolerance,
+            "Flags comparison score too low: {}",
+            comparison_result.score
+        );
     }
 }
