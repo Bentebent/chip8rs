@@ -50,7 +50,6 @@ mod compare {
     pub fn save_screenshot(emulator: &emulator::Emulator, path: &str) {
         let path = Path::new(path);
         if let Some(folders) = path.parent() {
-            println!("{:?}", folders);
             let _ = fs::create_dir_all(folders);
         }
         emulator.export_render_target(path.to_str().unwrap());
