@@ -29,7 +29,7 @@
             "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/target/debug/chip8rs.exe",
+            "program": "${workspaceFolder}/target/debug/chip8rs_client.exe",
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -45,7 +45,7 @@
                     "test",
                     "--no-run",
                     "--bin=chip8rs_client",
-                    "--package=chip8"
+                    "--package=chip8rs"
                 ],
                 "filter": {
                     "name": "chip8rs_client",
