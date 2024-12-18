@@ -1,5 +1,11 @@
 mod compare {
 
+    use std::{
+        env,
+        fs,
+        path::Path,
+    };
+
     use chip8rs::{
         emulator,
         RunnerEvent,
@@ -22,6 +28,7 @@ mod compare {
     pub const PIXEL_SIZE: i32 = 10;
 
     pub async fn set_window_conf() {
+        env::set_var("RUST_BACKTRACE", "1");
         set_fullscreen(false);
         request_new_screen_size((SCREEN_WIDTH * PIXEL_SIZE) as f32, (SCREEN_HEIGHT * PIXEL_SIZE) as f32);
 
@@ -43,7 +50,12 @@ mod compare {
     }
 
     pub fn save_screenshot(emulator: &emulator::Emulator, path: &str) {
-        emulator.export_render_target(path);
+        let path = Path::new(path);
+        if let Some(folders) = path.parent() {
+            println!("{:?}", folders);
+            let _ = fs::create_dir_all(folders);
+        }
+        emulator.export_render_target(path.to_str().unwrap());
     }
 }
 #[cfg(test)]
@@ -60,21 +72,97 @@ mod test {
     };
 
     #[macroquad::test]
-    async fn compare_ibm() {
-        env::set_var("RUST_BACKTRACE", "1");
+    async fn comparison_tests() {
         let generated_identifier: String = env::var("GIT_SHA").unwrap_or("local".to_string());
-        let path = r"assets/roms/IBM Logo.ch8";
+
+        compare_chip8_logo(generated_identifier.clone()).await;
+        compare_ibm(generated_identifier.clone()).await;
+        compare_corax(generated_identifier.clone()).await;
+        compare_flags(generated_identifier.clone()).await;
+    }
+
+    async fn compare_chip8_logo(generated_identifier: String) {
+        let path = r"assets/roms/test/1-chip8-logo.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
             Box::new(move |emulator| {
-                save_screenshot(emulator, &format!("tests/generated/ibm.{}.png", generated_identifier))
+                save_screenshot(
+                    emulator,
+                    &format!("tests/generated/1-chip8-logo/{}.png", generated_identifier),
+                )
             })
         })]);
 
         run_emulator(path, &mut events).await;
 
-        let baseline = image::open("tests/baseline/ibm.png").unwrap();
-        let generated = image::open(format!("tests/generated/ibm.{}.png", generated_identifier)).unwrap();
+        let baseline = image::open("tests/baseline/1-chip8-logo.png").unwrap();
+        let generated = image::open(format!("tests/generated/1-chip8-logo/{}.png", generated_identifier)).unwrap();
+
+        let comparison_result = compare::compare_images(baseline, generated);
+
+        assert_eq!(comparison_result.score, 1.0);
+    }
+
+    async fn compare_ibm(generated_identifier: String) {
+        let path = r"assets/roms/test/IBM Logo.ch8";
+        let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
+            let generated_identifier = generated_identifier.clone();
+            Box::new(move |emulator| {
+                save_screenshot(
+                    emulator,
+                    &format!("tests/generated/IBM Logo/{}.png", generated_identifier),
+                )
+            })
+        })]);
+
+        run_emulator(path, &mut events).await;
+
+        let baseline = image::open("tests/baseline/IBM Logo.png").unwrap();
+        let generated = image::open(format!("tests/generated/IBM Logo/{}.png", generated_identifier)).unwrap();
+
+        let comparison_result = compare::compare_images(baseline, generated);
+
+        assert_eq!(comparison_result.score, 1.0);
+    }
+
+    async fn compare_corax(generated_identifier: String) {
+        let path = r"assets/roms/test/3-corax+.ch8";
+        let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
+            let generated_identifier = generated_identifier.clone();
+            Box::new(move |emulator| {
+                save_screenshot(
+                    emulator,
+                    &format!("tests/generated/3-corax+/{}.png", generated_identifier),
+                )
+            })
+        })]);
+
+        run_emulator(path, &mut events).await;
+
+        let baseline = image::open("tests/baseline/corax.png").unwrap();
+        let generated = image::open(format!("tests/generated/3-corax+/{}.png", generated_identifier)).unwrap();
+
+        let comparison_result = compare::compare_images(baseline, generated);
+
+        assert_eq!(comparison_result.score, 1.0);
+    }
+
+    async fn compare_flags(generated_identifier: String) {
+        let path = r"assets/roms/test/4-flags.ch8";
+        let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
+            let generated_identifier = generated_identifier.clone();
+            Box::new(move |emulator| {
+                save_screenshot(
+                    emulator,
+                    &format!("tests/generated/4-flags/{}.png", generated_identifier),
+                )
+            })
+        })]);
+
+        run_emulator(path, &mut events).await;
+
+        let baseline = image::open("tests/baseline/4-flags.png").unwrap();
+        let generated = image::open(format!("tests/generated/4-flags/{}.png", generated_identifier)).unwrap();
 
         let comparison_result = compare::compare_images(baseline, generated);
 
