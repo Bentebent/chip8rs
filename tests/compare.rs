@@ -28,7 +28,6 @@ mod compare {
     pub const PIXEL_SIZE: i32 = 10;
 
     pub async fn set_window_conf() {
-        env::set_var("RUST_BACKTRACE", "1");
         set_fullscreen(false);
         request_new_screen_size((SCREEN_WIDTH * PIXEL_SIZE) as f32, (SCREEN_HEIGHT * PIXEL_SIZE) as f32);
 
@@ -74,7 +73,7 @@ mod test {
     #[macroquad::test]
     async fn comparison_tests() {
         let generated_identifier: String = env::var("GIT_SHA").unwrap_or("local".to_string());
-        let tolerance = 0.05;
+        let tolerance = 0.0001;
         compare_chip8_logo(generated_identifier.clone(), tolerance).await;
         compare_ibm(generated_identifier.clone(), tolerance).await;
         compare_corax(generated_identifier.clone(), tolerance).await;
