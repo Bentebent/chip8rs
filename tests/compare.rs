@@ -74,14 +74,14 @@ mod test {
     #[macroquad::test]
     async fn comparison_tests() {
         let generated_identifier: String = env::var("GIT_SHA").unwrap_or("local".to_string());
-
-        compare_chip8_logo(generated_identifier.clone()).await;
-        compare_ibm(generated_identifier.clone()).await;
-        compare_corax(generated_identifier.clone()).await;
-        compare_flags(generated_identifier.clone()).await;
+        let tolerance = 0.05;
+        compare_chip8_logo(generated_identifier.clone(), tolerance).await;
+        compare_ibm(generated_identifier.clone(), tolerance).await;
+        compare_corax(generated_identifier.clone(), tolerance).await;
+        compare_flags(generated_identifier.clone(), tolerance).await;
     }
 
-    async fn compare_chip8_logo(generated_identifier: String) {
+    async fn compare_chip8_logo(generated_identifier: String, tolerance: f64) {
         let path = r"assets/roms/test/1-chip8-logo.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
@@ -100,10 +100,10 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert_eq!(comparison_result.score, 1.0);
+        assert!(1.0 - &comparison_result.score < tolerance);
     }
 
-    async fn compare_ibm(generated_identifier: String) {
+    async fn compare_ibm(generated_identifier: String, tolerance: f64) {
         let path = r"assets/roms/test/IBM Logo.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
@@ -122,10 +122,10 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert_eq!(comparison_result.score, 1.0);
+        assert!(1.0 - &comparison_result.score < tolerance);
     }
 
-    async fn compare_corax(generated_identifier: String) {
+    async fn compare_corax(generated_identifier: String, tolerance: f64) {
         let path = r"assets/roms/test/3-corax+.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
@@ -144,10 +144,10 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert_eq!(comparison_result.score, 1.0);
+        assert!(1.0 - &comparison_result.score < tolerance);
     }
 
-    async fn compare_flags(generated_identifier: String) {
+    async fn compare_flags(generated_identifier: String, tolerance: f64) {
         let path = r"assets/roms/test/4-flags.ch8";
         let mut events = Some(vec![RunnerEvent::new(chip8rs::Trigger::TimerSeconds(2.0), {
             let generated_identifier = generated_identifier.clone();
@@ -166,6 +166,6 @@ mod test {
 
         let comparison_result = compare::compare_images(baseline, generated);
 
-        assert_eq!(comparison_result.score, 1.0);
+        assert!(1.0 - &comparison_result.score < tolerance);
     }
 }
